@@ -1,0 +1,23 @@
+services:
+  backend:
+    build:
+      context: ./backend
+    container_name: sp3-backend
+    ports:
+      - "8000:8000"
+    environment:
+      - INFLUXDB_URL=http://192.168.2.254:8086
+      - INFLUXDB_TOKEN=dev-machine-token
+      - INFLUXDB_ORG=factory
+      - INFLUXDB_BUCKET=machine_raw_v2
+    restart: always
+
+  frontend:
+    build:
+      context: .
+    container_name: sp3-frontend
+    ports:
+      - "5173:80" # Map host port 5173 to container port 80
+    depends_on:
+      - backend
+    restart: always

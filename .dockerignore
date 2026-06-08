@@ -1,0 +1,13 @@
+node_modules
+dist
+backend/venv
+backend/__pycache__
+.git
+.gitignore
+.dockerignore
+.vscode
+Dockerfile
+docker-compose.yml
+nginx.conf
+README.md
+*.log
