@@ -31,7 +31,7 @@ def calculate_minutes_remaining(present, max_l, delivery_speed):
         
     return round((max_l - present) / delivery_speed)
 
-def process_factory_summary(all_tables, speed_threshold=80, doffing_soon_threshold=10):
+def process_factory_summary(tables, speed_threshold=80, doffing_soon_threshold=10):
     """
     Processes InfluxDB tables to calculate factory-wide KPIs.
     
