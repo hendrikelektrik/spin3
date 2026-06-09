@@ -11,7 +11,8 @@ export const STATUS_CONFIG = {
   // Thresholds & Labels
   logic: {
     speedThreshold: 80,
-    staleDataThreshold: 1800, // Seconds (30 minutes)
+    doffingSoonThreshold: 10,
+    staleDataThreshold: 86400, // Seconds (24 hours)
     labels: {
       commError: 'COMM',
       stopped: 'STOP',

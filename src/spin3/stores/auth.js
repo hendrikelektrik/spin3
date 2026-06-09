@@ -4,9 +4,17 @@ import axios from 'axios'
 const API_BASE_URL = `http://${window.location.hostname}:8000`
 
 export const useAuthStore = defineStore('auth', {
-  state: () => ({
-    user: JSON.parse(localStorage.getItem('user')) || null,
-  }),
+  state: () => {
+    let user = null
+    try {
+      const storedUser = localStorage.getItem('user')
+      if (storedUser) user = JSON.parse(storedUser)
+    } catch (e) {
+      console.error('Failed to parse user from localStorage', e)
+      localStorage.removeItem('user')
+    }
+    return { user }
+  },
   actions: {
     async login(username, password) {
       try {

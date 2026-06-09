@@ -33,7 +33,7 @@ const auth = useAuthStore()
 const handleLogin = async () => {
   const success = await auth.login(username.value, password.value)
   if (success) {
-    router.push('/dashboard')
+    router.push('/spin3/status')
   } else {
     error.value = 'Invalid credentials'
   }

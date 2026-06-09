@@ -18,19 +18,84 @@
       </div>
     </header>
 
+    <div class="summary-ribbon">
+      <div class="summary-card">
+        <div class="summary-icon">📦</div>
+        <div class="summary-info">
+          <div class="summary-label">Total Production</div>
+          <div class="summary-value">{{ (telemetry.factorySummary.total_production || 0).toLocaleString() }}</div>
+        </div>
+      </div>
+      <div class="summary-card">
+        <div class="summary-icon">📈</div>
+        <div class="summary-info">
+          <div class="summary-label">Avg Efficiency</div>
+          <div class="summary-value">{{ (telemetry.factorySummary.avg_efficiency || 0).toFixed(1) }}%</div>
+        </div>
+      </div>
+      <div class="summary-card">
+        <div class="summary-icon">⚙️</div>
+        <div class="summary-info">
+          <div class="summary-label">Active Machines</div>
+          <div class="summary-value">{{ telemetry.factorySummary.running_count || 0 }} / {{ telemetry.factorySummary.total_machines || 0 }}</div>
+        </div>
+      </div>
+      <div class="summary-card" :class="{ 'highlight': (telemetry.factorySummary.doffing_count || 0) > 0 }">
+        <div class="summary-icon">🚜</div>
+        <div class="summary-info">
+          <div class="summary-label">Doffing Now</div>
+          <div class="summary-value">
+            <template v-if="telemetry.factorySummary.doffing_count > 0">
+              <span v-for="(mc, idx) in telemetry.factorySummary.doffing_machines" :key="mc">
+                MC {{ mc }}{{ idx < telemetry.factorySummary.doffing_machines.length - 1 ? ', ' : '' }}
+              </span>
+            </template>
+            <template v-else>0</template>
+          </div>
+        </div>
+      </div>
+      <div class="summary-card" :class="{ 'soon-highlight': (telemetry.factorySummary.doffing_soon_count || 0) > 0 }">
+        <div class="summary-icon">⏰</div>
+        <div class="summary-info">
+          <div class="summary-label">Doffing Soon</div>
+          <div class="summary-value">
+            <template v-if="telemetry.factorySummary.doffing_soon_count > 0">
+              <span v-for="(mc, idx) in telemetry.factorySummary.doffing_soon_machines" :key="mc">
+                MC {{ mc }}{{ idx < telemetry.factorySummary.doffing_soon_machines.length - 1 ? ', ' : '' }}
+              </span>
+            </template>
+            <template v-else>0</template>
+          </div>
+        </div>
+      </div>
+    </div>
+
     <main class="grid-container">
       <div class="status-grid">
-        <div v-for="mc in 48" :key="mc" 
+        <router-link v-for="mc in 48" :key="mc" 
+             :to="`/spin3/machine/${mc}`"
              class="status-card" 
+             :class="{ 'doffing-soon-card': isDoffingSoon(mc) }"
              :style="getStatusStyle(mc)">
           <div class="mc-id">MC {{ mc }}</div>
-          <div class="mc-speed">
+          
+          <div class="mc-top-right" v-if="getStatus(mc)?.minutes_remaining">
+             <span class="doff-time">{{ getStatus(mc)?.minutes_remaining }}m</span>
+          </div>
+
+          <div v-if="isRunning(mc)" class="mc-speed">
             <span class="value">{{ Math.round(getStatus(mc)?.value || 0) }}</span>
             <span class="unit">RPM</span>
           </div>
+          <div v-else class="mc-speed-placeholder"></div>
           <div class="mc-status-text">{{ getStatusText(mc) }}</div>
+          <div class="mc-progress-container" v-if="getStatus(mc)?.max_length > 0">
+            <div class="mc-progress-bar" 
+                 :style="{ width: Math.min(100, ((getStatus(mc)?.present_length || 0) / (getStatus(mc)?.max_length || 1)) * 100) + '%' }">
+            </div>
+          </div>
           <div class="mc-ago">{{ getTimeAgo(getStatus(mc)?.time) }}</div>
-        </div>
+        </router-link>
       </div>
     </main>
   </div>
@@ -49,7 +114,10 @@ let pollInterval = null
 const updateStatus = async () => {
   isLoading.value = true
   try {
-    await telemetry.fetchStatus('machine_telemetry', 'speed')
+    await Promise.all([
+      telemetry.fetchStatus('machine_telemetry', 'speed'),
+      telemetry.fetchFactorySummary('machine_telemetry')
+    ])
     lastRefresh.value = new Date().toLocaleTimeString()
   } finally {
     isLoading.value = false
@@ -58,6 +126,14 @@ const updateStatus = async () => {
 
 const getStatus = (mcId) => {
   return telemetry.machineStatus[mcId] || telemetry.machineStatus[mcId.toString()]
+}
+
+const isDoffingSoon = (mcId) => {
+  const status = getStatus(mcId)
+  return status && 
+         status.minutes_remaining !== null && 
+         status.minutes_remaining > 0 && 
+         status.minutes_remaining <= STATUS_CONFIG.logic.doffingSoonThreshold
 }
 
 const isStale = (timestamp) => {
@@ -110,6 +186,16 @@ const getTimeAgo = (timestamp) => {
   if (diff < 60) return `${diff}s ago`
   if (diff < 3600) return `${Math.floor(diff / 60)}m ago`
   return `${Math.floor(diff / 3600)}h ago`
+}
+
+const isRunning = (mcId) => {
+  const status = getStatus(mcId)
+  if (!status || isStale(status.time)) return false
+  return (
+    Number(status.step) !== 6 && 
+    Number(status.comm_ok) === 1 && 
+    status.value > STATUS_CONFIG.logic.speedThreshold
+  )
 }
 
 onMounted(() => {
@@ -181,6 +267,34 @@ onUnmounted(() => {
   padding: 15px 5px;
   text-align: center;
   transition: all 0.3s ease;
+  text-decoration: none;
+  display: block;
+  position: relative;
+}
+
+.status-card.doffing-soon-card {
+  box-shadow: inset 0 0 0 3px #f1c40f;
+  animation: pulse-soon 2s infinite;
+}
+
+@keyframes pulse-soon {
+  0% { filter: brightness(1); }
+  50% { filter: brightness(1.2); }
+  100% { filter: brightness(1); }
+}
+
+.mc-top-right {
+  position: absolute;
+  top: 2px;
+  right: 5px;
+}
+
+.doff-time {
+  font-size: 0.65rem;
+  font-weight: bold;
+  background: rgba(0,0,0,0.3);
+  padding: 1px 4px;
+  border-radius: 4px;
 }
 
 .status-card:hover {
@@ -203,6 +317,10 @@ onUnmounted(() => {
   margin-left: 2px;
 }
 
+.mc-speed-placeholder {
+  height: 2.5rem; /* Matches the height of mc-speed */
+}
+
 .mc-status-text {
   font-size: 0.8rem;
   font-weight: bold;
@@ -214,6 +332,21 @@ onUnmounted(() => {
   font-size: 0.7rem;
   opacity: 0.6;
   margin-top: 5px;
+}
+
+.mc-progress-container {
+  width: 80%;
+  height: 4px;
+  background: rgba(255, 255, 255, 0.2);
+  margin: 8px auto 0;
+  border-radius: 2px;
+  overflow: hidden;
+}
+
+.mc-progress-bar {
+  height: 100%;
+  background: rgba(255, 255, 255, 0.8);
+  transition: width 0.5s ease;
 }
 
 /* Loading Indicators */
@@ -241,5 +374,63 @@ onUnmounted(() => {
 @keyframes spin {
   0% { transform: rotate(0deg); }
   100% { transform: rotate(360deg); }
+}
+
+/* Summary Ribbon Styles */
+.summary-ribbon {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 15px;
+  margin-bottom: 20px;
+}
+
+.summary-card {
+  background: white;
+  padding: 15px;
+  border-radius: 8px;
+  display: flex;
+  align-items: center;
+  gap: 15px;
+  box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+  border-left: 4px solid #42b983;
+}
+
+.summary-card.highlight {
+  border-left-color: #f39c12; /* Doffing Orange */
+  background: #fff9f0;
+}
+
+.summary-card.soon-highlight {
+  border-left-color: #f1c40f; /* Yellow */
+  background: #fffeeb;
+}
+
+.summary-icon {
+  font-size: 1.5rem;
+  background: #f8f9fa;
+  width: 40px;
+  height: 40px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+}
+
+.summary-info {
+  display: flex;
+  flex-direction: column;
+}
+
+.summary-label {
+  font-size: 0.75rem;
+  color: #7f8c8d;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.summary-value {
+  font-size: 1.2rem;
+  font-weight: bold;
+  color: #2c3e50;
 }
 </style>

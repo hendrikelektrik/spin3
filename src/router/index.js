@@ -3,6 +3,7 @@ import { useAuthStore } from '../spin3/stores/auth'
 import Login from '../spin3/views/Login.vue'
 import StatusGrid from '../spin3/views/StatusGrid.vue'
 import HistoryTimeline from '../spin3/views/HistoryTimeline.vue'
+import MachineDetail from '../spin3/views/MachineDetail.vue'
 
 import MainLayout from '../spin3/components/MainLayout.vue'
 
@@ -22,6 +23,12 @@ const routes = [
         path: 'history',
         component: HistoryTimeline,
         name: 'HistoryTimeline'
+      },
+      {
+        path: 'machine/:id',
+        component: MachineDetail,
+        name: 'MachineDetail',
+        props: true
       },
       { path: '', redirect: 'status' }
     ]

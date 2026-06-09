@@ -9,9 +9,36 @@ const API_BASE_URL = import.meta.env.DEV
 export const useTelemetryStore = defineStore('telemetry', {
   state: () => ({
     telemetryData: {},
-    machineStatus: {} // Store latest values: { mc_no: { value, time } }
+    machineStatus: {}, // Store latest values: { mc_no: { value, time } }
+    machineDetails: {},  // Store detailed view data for a specific machine
+    factorySummary: {}   // Store factory-wide aggregated KPIs
   }),
   actions: {
+    async fetchFactorySummary(measurement) {
+      try {
+        const response = await axios.get(`${API_BASE_URL}/spin3/summary`, {
+          params: { measurement }
+        })
+        this.factorySummary = response.data
+        return response.data
+      } catch (error) {
+        console.error('Error fetching factory summary:', error)
+        this.factorySummary = {}
+      }
+    },
+    async fetchMachineDetail(measurement, mc_no) {
+      try {
+        const response = await axios.get(`${API_BASE_URL}/spin3/machine/${mc_no}`, {
+          params: { measurement }
+        })
+        this.machineDetails = response.data
+        return response.data
+      } catch (error) {
+        console.error(`Error fetching machine ${mc_no} details:`, error)
+        this.machineDetails = {}
+        throw error
+      }
+    },
     async fetchStatus(measurement, field) {
       try {
         const response = await axios.get(`${API_BASE_URL}/spin3/status`, {
@@ -43,6 +70,13 @@ export const useTelemetryStore = defineStore('telemetry', {
         this.telemetryData[key] = []
         throw error
       }
+    },
+    clearMachineDetails() {
+      this.machineDetails = {}
+    },
+    clearTelemetry(measurement, field, mc_no = null) {
+      const key = mc_no ? `${measurement}_${field}_${mc_no}` : `${measurement}_${field}`
+      this.telemetryData[key] = []
     }
   },
   getters: {

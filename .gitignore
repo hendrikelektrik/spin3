@@ -30,3 +30,6 @@ venv/
 env/
 __pycache__/
 *.pyc
+
+# Local Documentation
+GEMINI.md
